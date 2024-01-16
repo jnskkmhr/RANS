@@ -1,24 +1,44 @@
 from omni.isaac.sensor import IMUSensor, Camera
 from omni.isaac.core.utils.rotations import quat_to_rot_matrix
+import omni.replicator.core as rep
 
 import os
 import numpy as np
+import cv2
 import torch
+
+from omniisaacgymenvs.robots.sensors.writer import writer_factory
 
 class RLCamera:
     def __init__(self, prim_path:str, sensor_param:dict):
-        self.camera = Camera(prim_path=prim_path, 
-                             frequency=sensor_param["frequency"], 
-                             resolution=sensor_param["resolution"])
-        # self.camera.add_distance_to_image_plane_to_frame() #<- this does not enable depth image
-        self.camera.initialize()
         self.sensor_param = sensor_param
+        self.render_product = rep.create.render_product(
+            prim_path, 
+            resolution=sensor_param["resolution"])
+        self.annotators = {}
+        self.writers = {}
+        self.enable_rgb()
+        self.enable_depth()
+    
+    def enable_rgb(self):
+        rgb_annot = rep.AnnotatorRegistry.get_annotator("rgb")
+        rgb_annot.attach([self.render_product])
+        self.annotators.update({"rgb":rgb_annot})
+        self.writers.update({"rgb":writer_factory.get("RGBWriter")(add_noise=False)})
+    
+    def enable_depth(self):
+        depth_annot = rep.AnnotatorRegistry.get_annotator("distance_to_image_plane")
+        depth_annot.attach([self.render_product])
+        self.annotators.update({"depth":depth_annot})
+        self.writers.update({"depth":writer_factory.get("DepthWriter")(add_noise=False)})
     
     def get_observation(self):
-        frame_data = self.camera.get_current_frame()
-        rgb = frame_data["rgba"]
-        # rgb = torch.from_numpy(frame_data["rgba"][:, :, :3]).permute(2, 1, 0)
-        return {"rgb":rgb}
+        obs_buf = {}
+        for modality, annotator in self.annotators.items(): 
+            writer = self.writers[modality]
+            data_pt = writer.get_data(annotator.get_data())
+            obs_buf.update({modality:data_pt})
+        return obs_buf
 
 
 class RLIMU:
@@ -37,16 +57,18 @@ class RLIMU:
     def get_observation(self):
         """
         get linear accelerationa and angular veocity in imu optical coordinate
-        """
-        frame_data = self.imu.get_current_frame()
         # imu2global_rt = self._get_sensor_to_world_transorm()
         # lin_acc = imu2global_rt[:3, :3] @ frame_data["lin_acc"].T
         # ang_vel = imu2global_rt[:3, :3] @ frame_data["ang_vel"].T
+        """
+        frame_data = self.imu.get_current_frame()
+        # -> I dont know why the output is already tensorized though..
         lin_acc = frame_data["lin_acc"]
         ang_vel = frame_data["ang_vel"]
+        imu_reading = torch.cat((lin_acc, ang_vel))
         # lin_acc = torch.from_numpy(frame_data["lin_acc"])
         # ang_vel = torch.from_numpy(frame_data["ang_vel"])
-        return {"lin_acc":lin_acc, "ang_vel":ang_vel}
+        return {"imu":imu_reading}
 
 class SensorFactory:
     """
@@ -78,9 +100,6 @@ class RLSensors:
         for sensor_type, sensor_property in sensor_cfg.items():
             sensor = sensor_factory.get(sensor_type)(sensor_property["prim_path"], sensor_property["params"])
             self.sensors.append(sensor)
-            # if sensor_type == "RLIMU":
-            #     sensor = sensor_factory.get(sensor_type)(sensor_property["prim_path"], sensor_property["params"])
-            #     self.sensors.append(sensor)
     
     def get_observation(self):
         obs = {}

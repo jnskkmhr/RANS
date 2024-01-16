@@ -16,10 +16,6 @@ from omniisaacgymenvs.robots.articulations.views.mfp2d_virtual_thrusters_view im
     ModularFloatingPlatformView,
 )
 
-from omniisaacgymenvs.robots.sensors.sensor import RLSensors
-from omniisaacgymenvs.robots.sensors.rs_sensor import sensor_factory
-from omniisaacgymenvs.robots.sensors.utils.cfg_utils import generate_cfg
-
 from omniisaacgymenvs.utils.pin import VisualPin
 from omniisaacgymenvs.utils.arrow import VisualArrow
 
@@ -238,7 +234,6 @@ class MFP2DVirtual(RLTask):
         # Add the floating platform, and the marker
         self.get_floating_platform()
         self.get_target()
-        self.get_sensor()
 
         RLTask.set_up_scene(self, scene, replicate_physics=False)
 
@@ -252,7 +247,6 @@ class MFP2DVirtual(RLTask):
         scene.add(self._platforms)
         scene.add(self._platforms.base)
         scene.add(self._platforms.thrusters)
-        self.collect_sensors()
 
         # Add arrows to scene if task is go to pose
         scene, self._marker = self.task.add_visual_marker_to_scene(scene)
@@ -281,22 +275,6 @@ class MFP2DVirtual(RLTask):
         self.task.generate_target(
             self.default_zero_env_path, self._default_marker_position
         )
-
-    def get_sensor(self) -> None: 
-        """
-        FP body
-        /World/envs/env_12/Modular_floating_platform/core/body
-        """
-        self.sensor = sensor_factory.get("D455")(generate_cfg("/World/envs/env_0/Modular_floating_platform"))
-        self.sensor.attach_to_base(f"/World/envs/env_0/Modular_floating_platform/core/body")
-        self.sensor.initialize()
-
-    def collect_sensors(self): 
-        sensors = []
-        for i in range(self._num_envs):
-            rl_sensor = RLSensors(generate_cfg(f"/World/envs/env_{i}/Modular_floating_platform")["sensor"])
-            sensors.append(rl_sensor)
-        self.sensors = sensors
 
     def update_state(self) -> None:
         """
@@ -348,9 +326,6 @@ class MFP2DVirtual(RLTask):
         self.obs_buf["transforms"] = self.virtual_platform.current_transforms
         # Get the action masks
         self.obs_buf["masks"] = self.virtual_platform.action_masks
-
-        rs_obs = [sensor.get_observation() for sensor in self.sensors]
-        print(rs_obs)
 
         observations = {self._platforms.name: {"obs_buf": self.obs_buf}}
         return observations

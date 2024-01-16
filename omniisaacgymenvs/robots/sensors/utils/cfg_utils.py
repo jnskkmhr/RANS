@@ -3,7 +3,7 @@ def generate_cfg(env_path:str):
         "geom": 
             {
             "articulation_root": [f"{env_path}/D455", [0, 0.3, 0, 0, 0, 0]], 
-            "sensor_base": ["camera_link", "/home/lunar5/jnskkmhr/omn_isaacgym_ws/test_code/D455_mesh.usd"],
+            "sensor_base": ["camera_link", "/home/lunar5/jnskkmhr/omn_isaacgym_ws/RANS/omniisaacgymenvs/robots/usd/D455_mesh.usd"],
             "links" : ["camera_color_frame", "camera_color_optical_frame", "camera_imu_frame", "camera_imu_optical_frame"], 
             "joints" : [
                 ["camera_link", "camera_color_frame", "rigid", [0.011, 0, 0, 0, 0, 0]], 

@@ -2,8 +2,8 @@ from omni.isaac.core import World
 from omni.isaac.core.utils.stage import get_current_stage, add_reference_to_stage
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.rotations import euler_angles_to_quat
+from omni.isaac.sensor import IMUSensor
 from pxr import UsdGeom, UsdPhysics, Sdf, Gf
-from .sensor import RLCamera, RLIMU
 
 import os
 import numpy as np
@@ -99,8 +99,6 @@ class D435_Sensor:
         camera.GetAttribute("clippingRange").Set(self.sensor_cfg["RLCamera"]["params"]["clippingRange"])
         camera.GetAttribute("horizontalAperture").Set(self.sensor_cfg["RLCamera"]["params"]["horizontalAperture"])
         camera.GetAttribute("verticalAperture").Set(self.sensor_cfg["RLCamera"]["params"]["verticalAperture"])
-        self.camera = RLCamera(prim_path=self.sensor_cfg["RLCamera"]["prim_path"], 
-                               sensor_param=self.sensor_cfg["RLCamera"]["params"])
     
     def initialize(self):
         self._add_articulation_root()
@@ -115,18 +113,18 @@ class D435_Sensor:
         self._add_camera()
 
     def get_observation(self):
-        obs_buf = {}
-        camera_obs = self.camera.get_observation()
-        obs_buf.update(camera_obs)
-        return obs_buf
+        raise NotImplementedError
 
 class D435i_Sensor(D435_Sensor):
     def __init__(self, cfg:dict):
         super().__init__(cfg)
 
     def _add_imu(self):
-        self.imu = RLIMU(prim_path=self.sensor_cfg["RLIMU"]["prim_path"], 
-                         sensor_param=self.sensor_cfg["RLIMU"]["params"])
+        self.imu = IMUSensor(prim_path=self.sensor_cfg["RLIMU"]["prim_path"], 
+                             name="imu", 
+                             frequency=self.sensor_cfg["RLIMU"]["params"]["frequency"]
+                             )
+        self.imu.initialize()
     
     def initialize(self):
         self._add_articulation_root()
@@ -142,12 +140,7 @@ class D435i_Sensor(D435_Sensor):
         self._add_imu()
 
     def get_observation(self):
-        obs_buf = {}
-        camera_obs = self.camera.get_observation()
-        imu_obs = self.imu.get_observation()
-        obs_buf.update(camera_obs)
-        obs_buf.update(imu_obs)
-        return obs_buf
+        raise NotImplementedError
 
 class D455_Sensor(D435i_Sensor):
     def __init__(self, cfg:dict):

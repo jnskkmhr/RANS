@@ -1,6 +1,7 @@
-from omni.isaac.sensor import IMUSensor, Camera
 from omni.isaac.core.utils.rotations import quat_to_rot_matrix
 import omni.replicator.core as rep
+from omni.isaac.sensor import _sensor
+from omni.isaac.sensor import IMUSensor, Camera
 
 import os
 import numpy as np
@@ -40,36 +41,6 @@ class RLCamera:
             obs_buf.update({modality:data_pt})
         return obs_buf
 
-
-class RLIMU:
-    def __init__(self, prim_path:str, sensor_param:dict):
-        self.imu = IMUSensor(prim_path=prim_path, name="imu", frequency=sensor_param["frequency"])
-        self.imu.initialize()
-
-    def _get_sensor_to_world_transorm(self):
-        position, rotation = self.imu.get_world_pose()
-        rotation = quat_to_rot_matrix(rotation)
-        transform = np.zeros((4, 4))
-        transform[:3, :3] = rotation.T
-        transform[:3, 3] = -rotation.T @ position.T
-        return transform
-    
-    def get_observation(self):
-        """
-        get linear accelerationa and angular veocity in imu optical coordinate
-        # imu2global_rt = self._get_sensor_to_world_transorm()
-        # lin_acc = imu2global_rt[:3, :3] @ frame_data["lin_acc"].T
-        # ang_vel = imu2global_rt[:3, :3] @ frame_data["ang_vel"].T
-        """
-        frame_data = self.imu.get_current_frame()
-        # -> I dont know why the output is already tensorized though..
-        lin_acc = frame_data["lin_acc"]
-        ang_vel = frame_data["ang_vel"]
-        imu_reading = torch.cat((lin_acc, ang_vel))
-        # lin_acc = torch.from_numpy(frame_data["lin_acc"])
-        # ang_vel = torch.from_numpy(frame_data["ang_vel"])
-        return {"imu":imu_reading}
-
 class SensorFactory:
     """
     Factory class to create tasks."""
@@ -92,9 +63,11 @@ class SensorFactory:
 
 sensor_factory = SensorFactory()
 sensor_factory.register("RLCamera", RLCamera)
-sensor_factory.register("RLIMU", RLIMU)
     
 class RLSensors:
+    """
+    Clusters of RLSensors
+    """
     def __init__(self, sensor_cfg:dict):
         self.sensors = []
         for sensor_type, sensor_property in sensor_cfg.items():

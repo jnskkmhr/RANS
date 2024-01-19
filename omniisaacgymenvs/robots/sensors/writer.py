@@ -21,6 +21,19 @@ class DepthWriter(BaseWriter):
         depth_image = np.frombuffer(data, dtype=np.float32).reshape(*data.shape, -1)
         return torch.from_numpy(depth_image).squeeze().unsqueeze(0)
 
+class SemanticSegmentationWriter(BaseWriter):
+    def get_data(self, data):
+        raise NotImplementedError
+    
+class InstanceSegmentationWriter(BaseWriter):
+    def get_data(self, data):
+        raise NotImplementedError
+
+class ObjectDetectionWriter(BaseWriter):
+    def get_data(self, data):
+        raise NotImplementedError
+        
+
 class WriterFactory:
     """
     Factory class to create tasks."""
@@ -44,3 +57,6 @@ class WriterFactory:
 writer_factory = WriterFactory()
 writer_factory.register("RGBWriter", RGBWriter)
 writer_factory.register("DepthWriter", DepthWriter)
+writer_factory.register("SemanticSegmentationWriter", SemanticSegmentationWriter)
+writer_factory.register("InstanceSegmentationWriter", InstanceSegmentationWriter)
+writer_factory.register("ObjectDetectionWriter", ObjectDetectionWriter)

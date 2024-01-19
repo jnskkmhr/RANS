@@ -1,8 +1,7 @@
-from omni.isaac.core import World
 from omni.isaac.core.utils.stage import get_current_stage, add_reference_to_stage
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.rotations import euler_angles_to_quat
-from omni.isaac.sensor import IMUSensor
+import omni.kit.commands
 from pxr import UsdGeom, UsdPhysics, Sdf, Gf
 
 import os
@@ -31,7 +30,6 @@ class D435_Sensor:
         UsdGeom.Xformable(prim).AddRotateXYZOp()
         prim.GetAttribute('xformOp:translate').Set(Gf.Vec3f(*self.cfg["geom"]["articulation_root"][1][:3]))
         prim.GetAttribute('xformOp:rotateXYZ').Set((0, 0, 0))
-        # UsdPhysics.ArticulationRootAPI.Apply(prim)
 
     def attach_to_base(self, source_prim_path:str):
         fixedJoint = UsdPhysics.FixedJoint.Define(self.stage, os.path.join(self.articulation_root_path, self.sensor_base[0], "camera_attach"))
@@ -48,7 +46,7 @@ class D435_Sensor:
     
     def _add_sensor_link(self):
         sensor_link = self.sensor_base[0]
-        sensor_body_usd = self.sensor_base[1]
+        sensor_body_usd = os.path.join(os.getcwd(), self.sensor_base[1])
         prim = self.stage.DefinePrim(os.path.join(self.articulation_root_path, sensor_link), "Xform")
         UsdGeom.Xformable(prim).AddTranslateOp()
         UsdGeom.Xformable(prim).AddRotateXYZOp()
@@ -115,34 +113,39 @@ class D435_Sensor:
     def get_observation(self):
         raise NotImplementedError
 
-class D435i_Sensor(D435_Sensor):
-    def __init__(self, cfg:dict):
-        super().__init__(cfg)
+# class D435i_Sensor(D435_Sensor):
+#     """
+#     Since IMU simulation does not work in OIGE, I am commenting this for now.
+#     """
+#     def __init__(self, cfg:dict):
+#         super().__init__(cfg)
 
-    def _add_imu(self):
-        self.imu = IMUSensor(prim_path=self.sensor_cfg["RLIMU"]["prim_path"], 
-                             name="imu", 
-                             frequency=self.sensor_cfg["RLIMU"]["params"]["frequency"]
-                             )
-        self.imu.initialize()
+#     def _add_imu(self):
+#         _, self.imu = omni.kit.commands.execute(
+#                 "IsaacSensorCreateImuSensor",
+#                 path=self.sensor_cfg["RLIMU"]["prim_path"].split("/")[-1],
+#                 parent="/".join(self.sensor_cfg["RLIMU"]["prim_path"].split("/")[:-1]),
+#                 sensor_period=-1,
+#                 visualize=False,
+#             )
     
-    def initialize(self):
-        self._add_articulation_root()
-        self._add_sensor_link()
-        for link_name in self.links:
-            self._add_link(link_name)
+#     def initialize(self):
+#         self._add_articulation_root()
+#         self._add_sensor_link()
+#         for link_name in self.links:
+#             self._add_link(link_name)
         
-        for i, joint in enumerate(self.joints):
-            self._static_transform(joint[1], joint[3])
-            self._add_joint(joint[0], joint[1], joint[2]+f"_{i}", joint[3])
+#         for i, joint in enumerate(self.joints):
+#             self._static_transform(joint[1], joint[3])
+#             self._add_joint(joint[0], joint[1], joint[2]+f"_{i}", joint[3])
         
-        self._add_camera()
-        self._add_imu()
+#         self._add_camera()
+#         self._add_imu()
 
-    def get_observation(self):
-        raise NotImplementedError
+#     def get_observation(self):
+#         raise NotImplementedError
 
-class D455_Sensor(D435i_Sensor):
+class D455_Sensor(D435_Sensor):
     def __init__(self, cfg:dict):
         super().__init__(cfg)
 
@@ -169,5 +172,5 @@ class SensorFactory:
 
 sensor_factory = SensorFactory()
 sensor_factory.register("D435", D435_Sensor)
-sensor_factory.register("D435i", D435i_Sensor)
+# sensor_factory.register("D435i", D435i_Sensor)
 sensor_factory.register("D455", D455_Sensor)

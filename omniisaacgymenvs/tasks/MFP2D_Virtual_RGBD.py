@@ -16,8 +16,8 @@ from omniisaacgymenvs.robots.articulations.views.mfp2d_virtual_thrusters_view im
     ModularFloatingPlatformView,
 )
 
-from omniisaacgymenvs.robots.sensors.sensor import RLSensors
 from omniisaacgymenvs.robots.sensors.rs_sensor import sensor_factory
+from omniisaacgymenvs.robots.sensors.sensor import RLSensors
 from omniisaacgymenvs.robots.sensors.utils.cfg_utils import generate_cfg
 
 from omniisaacgymenvs.utils.pin import VisualPin
@@ -57,7 +57,7 @@ from dataclasses import dataclass
 EPS = 1e-6  # small constant to avoid divisions by 0 and log(0)
 
 
-class MFP2DVirtual_RGBDI(RLTask):
+class MFP2DVirtual_RGBD(RLTask):
     """
     The main class used to run tasks on the floating platform.
     Unlike other class in this repo, this class can be used to run different tasks.
@@ -247,11 +247,11 @@ class MFP2DVirtual_RGBDI(RLTask):
         self._platforms = ModularFloatingPlatformView(
             prim_paths_expr=root_path, name="modular_floating_platform_view"
         )
-
         # Add views to scene
         scene.add(self._platforms)
         scene.add(self._platforms.base)
         scene.add(self._platforms.thrusters)
+
         self.collect_sensors()
 
         # Add arrows to scene if task is go to pose
@@ -287,16 +287,18 @@ class MFP2DVirtual_RGBDI(RLTask):
         FP body
         /World/envs/env_12/Modular_floating_platform/core/body
         """
-        self.sensor = sensor_factory.get("D455")(generate_cfg("/World/envs/env_0/Modular_floating_platform"))
-        self.sensor.attach_to_base(f"/World/envs/env_0/Modular_floating_platform/core/body")
+        module_name="D435"
+        self.sensor = sensor_factory.get(module_name)(
+            generate_cfg(env_path=self.default_zero_env_path + "/Modular_floating_platform", module=module_name))
+        self.sensor.attach_to_base(self.default_zero_env_path + "/Modular_floating_platform/core/body")
         self.sensor.initialize()
 
     def collect_sensors(self): 
-        sensors = []
+        active_sensors = []
         for i in range(self._num_envs):
             rl_sensor = RLSensors(generate_cfg(f"/World/envs/env_{i}/Modular_floating_platform")["sensor"])
-            sensors.append(rl_sensor)
-        self.sensors = sensors
+            active_sensors.append(rl_sensor)
+        self.active_sensors = active_sensors
 
     def update_state(self) -> None:
         """
@@ -348,28 +350,24 @@ class MFP2DVirtual_RGBDI(RLTask):
         self.obs_buf["transforms"] = self.virtual_platform.current_transforms
         # Get the action masks
         self.obs_buf["masks"] = self.virtual_platform.action_masks
-
-        rgb_obs, depth_obs, imu_obs = self.get_RGBD_IMU()
+        # Get the sensor data
+        rgb_obs, depth_obs = self.get_rgbd_data()
 
         observations = {self._platforms.name: {"obs_buf": self.obs_buf}}
         return observations
     
-    def get_RGBD_IMU(self):
+    def get_rgbd_data(self):
         """
-        return batched sensor data (RGBD + IMU)
+        return batched sensor data (RGBD)
         rgb: (batch_size, 3, height, width)
         depth: (batch_size, 1, height, width)
-        imu: (batch_size, 6)
         """
-        rs_obs = [sensor.get_observation() for sensor in self.sensors]
+        rs_obs = [sensor.get_observation() for sensor in self.active_sensors]
         rgb = torch.stack([ob["rgb"] for ob in rs_obs])
         depth = torch.stack([ob["depth"] for ob in rs_obs])
-        imu = torch.stack([ob["imu"] for ob in rs_obs])
         print(f"{rgb.dtype}, {rgb.shape}")
         print(f"{depth.dtype}, {depth.shape}")
-        print(f"{imu.dtype}, {imu.shape}")
-        print(imu)
-        return rgb, depth, imu
+        return rgb, depth
 
     def pre_physics_step(self, actions: torch.Tensor) -> None:
         """

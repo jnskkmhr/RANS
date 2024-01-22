@@ -130,6 +130,33 @@ env:
     penalize_angular_velocities_fn: "lambda x,step: -torch.abs(x)*0.1"
     penalize_angular_velocities_c1: 0.01
     penalize_angular_velocities_c2: 0.00
+  
+  sensors:
+    geom:
+      module_name: "D455"
+      articulation_root:
+        prim_path: "${.....env_path}/${..module_name}"
+        pose: [0.3, 0, 0, 0, 0, -90]
+      sensor_base:
+        prim_name: "camera_link"
+        usd_path: "robots/usd/d455_mesh.usd"
+      links: ["camera_color_frame", "camera_color_optical_frame"]
+      joints: [
+                ["camera_link", "camera_color_frame", "rigid", [0.011, 0, 0, 0, 0, 0]], 
+                ["camera_link", "camera_color_optical_frame", "rigid", [0.011, 0, 0, -90, 0, 0]],
+              ]
+    sensor:
+      RLCamera:
+        prim_path: "${.....env_path}/D455/camera_color_optical_frame/Camera"
+        rotation: [180, 0, 0]
+        params:
+          focalLength: 1.93
+          focusDistance: 50.0
+          clippingRange: [0.6, 100.0]
+          resolution: [1280, 720]
+          frequency: 20
+          horizontalAperture: 3.60
+          verticalAperture: 2.70
 
 sim:
   dt: 0.02

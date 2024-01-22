@@ -13,11 +13,13 @@ from omniisaacgymenvs.robots.sensors.writer import writer_factory
 class RLCamera:
     def __init__(self, prim_path:str, sensor_param:dict):
         self.sensor_param = sensor_param
+        #sensor_param["resolution"] does not return list, so expand it and put it in list again.
         self.render_product = rep.create.render_product(
             prim_path, 
-            resolution=sensor_param["resolution"])
+            resolution=[*sensor_param["resolution"]])
         self.annotators = {}
         self.writers = {}
+        # TODO: make this also parameter.
         self.enable_rgb()
         self.enable_depth()
     

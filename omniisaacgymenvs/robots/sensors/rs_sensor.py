@@ -17,7 +17,7 @@ class D435_Sensor:
         joints = [["camera_link", "camera_color_frame", "rigid", [...]], ...]
         """
         self.cfg = cfg
-        self.articulation_root_path = cfg["geom"]["articulation_root"][0]
+        self.articulation_root_path = cfg["geom"]["articulation_root"]["prim_path"]
         self.sensor_base = cfg["geom"]["sensor_base"]
         self.links = cfg["geom"]["links"]
         self.joints = cfg["geom"]["joints"]
@@ -28,16 +28,16 @@ class D435_Sensor:
         prim = self.stage.DefinePrim(self.articulation_root_path, "Xform")
         UsdGeom.Xformable(prim).AddTranslateOp()
         UsdGeom.Xformable(prim).AddRotateXYZOp()
-        prim.GetAttribute('xformOp:translate').Set(Gf.Vec3f(*self.cfg["geom"]["articulation_root"][1][:3]))
-        prim.GetAttribute('xformOp:rotateXYZ').Set((0, 0, 0))
+        prim.GetAttribute('xformOp:translate').Set(Gf.Vec3f(*self.cfg["geom"]["articulation_root"]["pose"][:3]))
+        prim.GetAttribute('xformOp:rotateXYZ').Set(Gf.Vec3f(*self.cfg["geom"]["articulation_root"]["pose"][3:]))
 
     def attach_to_base(self, source_prim_path:str):
-        fixedJoint = UsdPhysics.FixedJoint.Define(self.stage, os.path.join(self.articulation_root_path, self.sensor_base[0], "camera_attach"))
+        fixedJoint = UsdPhysics.FixedJoint.Define(self.stage, os.path.join(self.articulation_root_path, self.sensor_base["prim_name"], "camera_attach"))
         fixedJoint.CreateBody0Rel().SetTargets( [Sdf.Path(source_prim_path)])
-        fixedJoint.CreateBody1Rel().SetTargets( [Sdf.Path(os.path.join(self.articulation_root_path, self.sensor_base[0]))])
+        fixedJoint.CreateBody1Rel().SetTargets( [Sdf.Path(os.path.join(self.articulation_root_path, self.sensor_base["prim_name"]))])
 
-        translation = self.cfg["geom"]["articulation_root"][1][:3]
-        rotation = self.cfg["geom"]["articulation_root"][1][3:]
+        translation = self.cfg["geom"]["articulation_root"]["pose"][:3]
+        rotation = self.cfg["geom"]["articulation_root"]["pose"][3:]
         rotation_quat = euler_angles_to_quat(euler_angles=rotation, degrees=True)
         fixedJoint.CreateLocalPos0Attr().Set(Gf.Vec3f(*translation))
         fixedJoint.CreateLocalRot0Attr().Set(Gf.Quatf(rotation_quat[0], *rotation_quat[1:].tolist()))
@@ -45,8 +45,9 @@ class D435_Sensor:
         fixedJoint.CreateLocalRot1Attr().Set(Gf.Quatf(1.0))
     
     def _add_sensor_link(self):
-        sensor_link = self.sensor_base[0]
-        sensor_body_usd = os.path.join(os.getcwd(), self.sensor_base[1])
+        # body usd attached to camera_link xform (identity transform)
+        sensor_link = self.sensor_base["prim_name"]
+        sensor_body_usd = os.path.join(os.getcwd(), self.sensor_base["usd_path"])
         prim = self.stage.DefinePrim(os.path.join(self.articulation_root_path, sensor_link), "Xform")
         UsdGeom.Xformable(prim).AddTranslateOp()
         UsdGeom.Xformable(prim).AddRotateXYZOp()
@@ -78,7 +79,7 @@ class D435_Sensor:
         rotation = Gf.Quatf(rotatation_quat[0], *rotatation_quat[1:].tolist())
 
         # define joint
-        fixedJoint = UsdPhysics.FixedJoint.Define(self.stage, os.path.join(self.articulation_root_path, self.sensor_base[0], joint_name))
+        fixedJoint = UsdPhysics.FixedJoint.Define(self.stage, os.path.join(self.articulation_root_path, self.sensor_base["prim_name"], joint_name))
         fixedJoint.CreateBody0Rel().SetTargets( [Sdf.Path(os.path.join(self.articulation_root_path, parent_link_name))])
         fixedJoint.CreateBody1Rel().SetTargets( [Sdf.Path(os.path.join(self.articulation_root_path, child_link_name))])
 
@@ -91,14 +92,17 @@ class D435_Sensor:
         camera = self.stage.DefinePrim(self.sensor_cfg["RLCamera"]["prim_path"], 'Camera')
         UsdGeom.Xformable(camera).AddTranslateOp()
         UsdGeom.Xformable(camera).AddRotateXYZOp()
-        camera.GetAttribute("xformOp:rotateXYZ").Set(self.sensor_cfg["RLCamera"]["rotation"])
+        camera.GetAttribute("xformOp:rotateXYZ").Set(Gf.Vec3f(*self.sensor_cfg["RLCamera"]["rotation"]))
         camera.GetAttribute('focalLength').Set(self.sensor_cfg["RLCamera"]["params"]["focalLength"])
         camera.GetAttribute('focusDistance').Set(self.sensor_cfg["RLCamera"]["params"]["focusDistance"])
-        camera.GetAttribute("clippingRange").Set(self.sensor_cfg["RLCamera"]["params"]["clippingRange"])
+        camera.GetAttribute("clippingRange").Set(Gf.Vec2f(*self.sensor_cfg["RLCamera"]["params"]["clippingRange"]))
         camera.GetAttribute("horizontalAperture").Set(self.sensor_cfg["RLCamera"]["params"]["horizontalAperture"])
         camera.GetAttribute("verticalAperture").Set(self.sensor_cfg["RLCamera"]["params"]["verticalAperture"])
     
     def initialize(self):
+        """
+        [parent_body, child_body, joint_type, transform]
+        """
         self._add_articulation_root()
         self._add_sensor_link()
         for link_name in self.links:
